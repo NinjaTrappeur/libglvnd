@@ -407,7 +407,7 @@ __GLXvendorInfo *__glXLookupVendorByName(const char *vendorName)
         if (!pEntry) {
             __GLXvendorInfo *vendor;
             __PFNGLXMAINPROC glxMainProc;
-            char *filename;
+            char *filename, *nix_path;
             int i, count;
             Bool success;
 
@@ -425,7 +425,24 @@ __GLXvendorInfo *__glXLookupVendorByName(const char *vendorName)
 
             filename = ConstructVendorLibraryFilename(vendorName);
             if (filename) {
-                vendor->dlhandle = dlopen(filename, RTLD_LAZY);
+                nix_path = secure_getenv("NIX_GLVND_GLX_PATH");
+                if(nix_path) {
+                    size_t nix_path_len;
+                    char* path_sep, *full_path;
+                    nix_path_len = strlen(nix_path);
+                    // Let's make sure we don't end up with a double
+                    // slash in the path.
+                    if (nix_path > 0 && nix_path[nix_path_len - 1] != '/') {
+                        path_sep = "/";
+                    } else {
+                        path_sep = "";
+                    }
+                    glvnd_asprintf(&full_path, "%s%s%s", nix_path, path_sep, filename);
+                    vendor->dlhandle = dlopen(full_path, RTLD_LAZY);
+                    free(full_path);
+                } else {
+                    vendor->dlhandle = dlopen(filename, RTLD_LAZY);
+                }
             }
             free(filename);
             if (vendor->dlhandle == NULL) {
